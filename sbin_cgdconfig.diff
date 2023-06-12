@@ -1,0 +1,161 @@
+$NetBSD$
+
+Common subdirectories: sbin/cgdconfig.orig/CVS and sbin/cgdconfig/CVS
+diff -p -U 3 sbin/cgdconfig.orig/Makefile sbin/cgdconfig/Makefile
+--- sbin/cgdconfig.orig/Makefile	2023-05-28 12:52:20.083235991 +0000
++++ sbin/cgdconfig/Makefile
+@@ -29,4 +29,21 @@ ARGON2_NO_THREADS=1
+ .include "${NETBSDSRCDIR}/external/apache2/argon2/lib/libargon2/Makefile.inc"
+ .endif
+ 
++.if ${MKZFS} != "no"
++LDADD+=	-lnvpair
++CPPFLAGS+=	-DHAVE_ZFS
++
++OSNET=${NETBSDSRCDIR}/external/cddl/osnet
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/include
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/sys
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/dist/head
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/dist/lib/libzpool/common
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/dist/uts/common
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/dist/uts/common/fs/zfs
++CPPFLAGS.cgdconfig.c+=	-I${OSNET}/dist/lib/libnvpair
++
++COPTS.cgdconfig.c+=	-Wno-unknown-pragmas
++COPTS.cgdconfig.c+=	-Wno-strict-prototypes
++.endif
++
+ .include <bsd.prog.mk>
+diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.8 sbin/cgdconfig/cgdconfig.8
+--- sbin/cgdconfig.orig/cgdconfig.8	2023-05-28 13:23:27.353643365 +0000
++++ sbin/cgdconfig/cgdconfig.8
+@@ -270,6 +270,8 @@ scan for a valid Master Boot Record.
+ scan for a valid GUID partition table.
+ .It ffs
+ scan for a valid FFS file system.
++.It zfs
++scan for a valid ZFS vdev label.
+ .It re-enter
+ prompt for passphrase twice, and ensure entered passphrases are
+ identical.
+diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.c sbin/cgdconfig/cgdconfig.c
+--- sbin/cgdconfig.orig/cgdconfig.c	2022-11-17 06:40:38.000000000 +0000
++++ sbin/cgdconfig/cgdconfig.c
+@@ -73,6 +73,11 @@ __RCSID("$NetBSD: cgdconfig.c,v 1.61 202
+ 
+ #include <ufs/ffs/fs.h>
+ 
++#ifdef HAVE_ZFS
++#include <libnvpair.h>
++#include <sys/vdev_impl.h>
++#endif
++
+ #include "params.h"
+ #include "pkcs5_pbkdf2.h"
+ #include "utils.h"
+@@ -170,6 +175,9 @@ static int	 verify_ffs(int);
+ static int	 verify_reenter(struct params *);
+ static int	 verify_mbr(int);
+ static int	 verify_gpt(int);
++#ifdef HAVE_ZFS
++static int	 verify_zfs(int);
++#endif
+ 
+ __dead static void	 usage(void);
+ 
+@@ -1024,6 +1032,10 @@ verify(struct params *p, int fd)
+ 		return verify_mbr(fd);
+ 	case VERIFY_GPT:
+ 		return verify_gpt(fd);
++#ifdef HAVE_ZFS
++	case VERIFY_ZFS:
++		return verify_zfs(fd);
++#endif
+ 	default:
+ 		warnx("unimplemented verification method");
+ 		return -1;
+@@ -1182,6 +1194,47 @@ verify_gpt(int fd)
+ 	return ret;
+ }
+ 
++#ifdef HAVE_ZFS
++static int
++verify_zfs(int fd)
++{
++	vdev_label_t *vdev_label;
++	vdev_phys_t *vdev_phys;
++	nvlist_t *config = NULL;
++	ssize_t ret;
++
++	/*
++	 * Read the first ZFS vdev label located at offset 0.
++	 */
++	vdev_label = emalloc(sizeof *vdev_label);
++	ret = prog_pread(fd, vdev_label, sizeof(*vdev_label), 0);
++	if (ret < 0) {
++		warn("pread");
++		ret = 1;
++		goto bail;
++	} else if ((size_t)ret < sizeof(*vdev_label)) {
++		warnx("pread: incomplete block");
++		ret = 1;
++		goto bail;
++	};
++
++	ret = 0;
++
++	vdev_phys = &(vdev_label->vl_vdev_phys);
++	if ((nvlist_unpack(vdev_phys->vp_nvlist,
++		sizeof(vdev_phys->vp_nvlist), &config, 0)) != 0 ||
++		!nvlist_exists(config, "name"))
++	{
++		ret = 1;
++	};
++
++	nvlist_free(config);
++ bail:
++	free(vdev_label);
++	return ret;
++}
++#endif
++
+ static off_t sblock_try[] = SBLOCKSEARCH;
+ 
+ static int
+diff -p -U 3 sbin/cgdconfig.orig/params.c sbin/cgdconfig/params.c
+--- sbin/cgdconfig.orig/params.c	2023-05-28 13:29:40.277737528 +0000
++++ sbin/cgdconfig/params.c
+@@ -287,6 +287,10 @@ params_verify_method(string_t *in)
+ 		p->verify_method = VERIFY_MBR;
+ 	if (!strcmp("gpt", vm))
+ 		p->verify_method = VERIFY_GPT;
++#ifdef HAVE_ZFS
++	if (!strcmp("zfs", vm))
++		p->verify_method = VERIFY_ZFS;
++#endif
+ 
+ 	string_free(in);
+ 
+@@ -1065,6 +1069,11 @@ params_fput(struct params *p, FILE *f)
+ 	case VERIFY_GPT:
+ 		print_kvpair_cstr(f, ts, "verify_method", "gpt");
+ 		break;
++#ifdef HAVE_ZFS
++	case VERIFY_ZFS:
++		print_kvpair_cstr(f, ts, "verify_method", "zfs");
++		break;
++#endif
+ 	default:
+ 		warnx("unsupported verify_method (%d)", p->verify_method);
+ 		return -1;
+diff -p -U 3 sbin/cgdconfig.orig/params.h sbin/cgdconfig/params.h
+--- sbin/cgdconfig.orig/params.h	2023-05-28 13:26:55.806960846 +0000
++++ sbin/cgdconfig/params.h
+@@ -81,6 +81,7 @@ struct params {
+ #define VERIFY_REENTER		0x4
+ #define VERIFY_MBR      	0x5
+ #define VERIFY_GPT      	0x6
++#define VERIFY_ZFS      	0x7
+ 
+ /* shared key derivation methods */
+ 

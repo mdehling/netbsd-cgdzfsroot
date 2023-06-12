@@ -1,0 +1,35 @@
+#	$NetBSD$
+#
+# list file (c.f. parselist.awk) for root on CGD encrypted ZFS.
+#
+
+PROG	sbin/cgdconfig
+
+SYMLINK	/boot/cgd	etc/cgd
+
+PROG	sbin/modload
+PROG	sbin/modunload
+PROG	sbin/modstat
+
+SRCDIRS	external/cddl/osnet/sbin
+PROG	sbin/zpool
+PROG	sbin/zfs	sbin/mount_zfs
+
+PROG	sbin/sysctl
+
+LIBS	-lcrypto
+LIBS	-lnvpair
+LIBS	-luutil
+LIBS	-lzfs
+LIBS	-lavl
+LIBS	-lm
+LIBS	-lpthread
+LIBS	-lumem
+#LIBS	-lutil		# replaced by libhack
+LIBS	-lz
+LIBS	-lzfs_core
+
+COPY	${NETBSDSRCDIR}/distrib/common/cgdzfsroot.rc etc/rc
+
+SYMLINK	altroot/stand	stand
+SYMLINK	altroot/libdata	libdata
