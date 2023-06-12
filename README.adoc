@@ -24,7 +24,7 @@ The `cgdzfsroot` ramdisk is a straightforward combination of NetBSD's
 `cgdroot` and `zfsroot` ramdisks.  To build it, copy the contents of the `src`
 directory to your NetBSD source tree and run the following commands:
 
-[source,bash]
+[source,shell-session]
 ----
 # cd src/distrib/amd64/ramdisks/ramdisk-cgdzfsroot
 # /path/to/tooldir/bin/nbmake-amd64
