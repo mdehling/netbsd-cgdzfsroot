@@ -12,8 +12,7 @@ Patching the CGD Configuration Utility
 With this patch, `cgdconfig` can unlock a CGD partition containing a ZFS pool
 without the need to add a GPT label in between.  The method used to verify the
 ZFS pool is the same as implemented in `usr.sbin/fstyp`.  To apply the patch,
-simply run `patch < /path/to/sbin_cgdconfig.diff` in your system source
-directory.
+simply run `patch < /path/to/cgdconfig.diff` in your system source directory.
 
 NOTE: The patch is not required to use the ramdisk if you plan on placing a
 GPT label inside your CGD partition or use some other means of verification.
@@ -21,18 +20,16 @@ GPT label inside your CGD partition or use some other means of verification.
 Building the Ramdisk
 --------------------
 The `cgdzfsroot` ramdisk is a straightforward combination of NetBSD's
-`cgdroot` and `zfsroot` ramdisks.  To build it, copy the contents of the `src`
-directory to your NetBSD source tree and run the following commands:
+`cgdroot` and `zfsroot` ramdisks.  Run `patch < /path/to/cgdzfsroot.diff` in
+your system source directory to create the necessary files and update your
+system.
 
 [source,shell-session]
 ----
-# cd src/distrib/amd64/ramdisks/ramdisk-cgdzfsroot
-# /path/to/tooldir/bin/nbmake-amd64
-[...]
-# cd src/distrib/amd64/kmod-cgdzfsroot
-# /path/to/tooldir/bin/nbmake-amd64
+# cd /usr/src
+# ./build.sh -u -O /usr/obj -j4 distribution
 ----
 
 This should produce a kernel module `cgdzfsroot.kmod` containing the ramdisk
-in `/path/to/objdir/distrib/amd64/kmod-cgdzfsroot`.  This will need to go in
-your EFI/boot partition.
+in `/usr/obj/distrib/amd64/kmod-cgdzfsroot`.  This will need to go in your
+EFI/boot partition.

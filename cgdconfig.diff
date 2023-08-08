@@ -1,10 +1,11 @@
-$NetBSD$
-
-Common subdirectories: sbin/cgdconfig.orig/CVS and sbin/cgdconfig/CVS
-diff -p -U 3 sbin/cgdconfig.orig/Makefile sbin/cgdconfig/Makefile
---- sbin/cgdconfig.orig/Makefile	2023-05-28 12:52:20.083235991 +0000
-+++ sbin/cgdconfig/Makefile
-@@ -29,4 +29,21 @@ ARGON2_NO_THREADS=1
+Index: sbin/cgdconfig/Makefile
+===================================================================
+RCS file: /cvsroot/src/sbin/cgdconfig/Makefile,v
+retrieving revision 1.22
+diff -u -r1.22 Makefile
+--- sbin/cgdconfig/Makefile	12 Aug 2022 10:49:17 -0000	1.22
++++ sbin/cgdconfig/Makefile	8 Aug 2023 19:23:05 -0000
+@@ -29,4 +29,21 @@
  .include "${NETBSDSRCDIR}/external/apache2/argon2/lib/libargon2/Makefile.inc"
  .endif
  
@@ -26,22 +27,30 @@ diff -p -U 3 sbin/cgdconfig.orig/Makefile sbin/cgdconfig/Makefile
 +.endif
 +
  .include <bsd.prog.mk>
-diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.8 sbin/cgdconfig/cgdconfig.8
---- sbin/cgdconfig.orig/cgdconfig.8	2023-05-28 13:23:27.353643365 +0000
-+++ sbin/cgdconfig/cgdconfig.8
-@@ -270,6 +270,8 @@ scan for a valid Master Boot Record.
+Index: sbin/cgdconfig/cgdconfig.8
+===================================================================
+RCS file: /cvsroot/src/sbin/cgdconfig/cgdconfig.8,v
+retrieving revision 1.57
+diff -u -r1.57 cgdconfig.8
+--- sbin/cgdconfig/cgdconfig.8	12 Aug 2022 10:49:47 -0000	1.57
++++ sbin/cgdconfig/cgdconfig.8	8 Aug 2023 19:23:05 -0000
+@@ -270,6 +270,8 @@
  scan for a valid GUID partition table.
  .It ffs
  scan for a valid FFS file system.
 +.It zfs
-+scan for a valid ZFS vdev label.
++scan for a valid ZFS vdev label (if compiled with MKZFS).
  .It re-enter
  prompt for passphrase twice, and ensure entered passphrases are
  identical.
-diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.c sbin/cgdconfig/cgdconfig.c
---- sbin/cgdconfig.orig/cgdconfig.c	2022-11-17 06:40:38.000000000 +0000
-+++ sbin/cgdconfig/cgdconfig.c
-@@ -73,6 +73,11 @@ __RCSID("$NetBSD: cgdconfig.c,v 1.61 202
+Index: sbin/cgdconfig/cgdconfig.c
+===================================================================
+RCS file: /cvsroot/src/sbin/cgdconfig/cgdconfig.c,v
+retrieving revision 1.61
+diff -u -r1.61 cgdconfig.c
+--- sbin/cgdconfig/cgdconfig.c	17 Nov 2022 06:40:38 -0000	1.61
++++ sbin/cgdconfig/cgdconfig.c	8 Aug 2023 19:23:05 -0000
+@@ -73,6 +73,11 @@
  
  #include <ufs/ffs/fs.h>
  
@@ -53,7 +62,7 @@ diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.c sbin/cgdconfig/cgdconfig.c
  #include "params.h"
  #include "pkcs5_pbkdf2.h"
  #include "utils.h"
-@@ -170,6 +175,9 @@ static int	 verify_ffs(int);
+@@ -170,6 +175,9 @@
  static int	 verify_reenter(struct params *);
  static int	 verify_mbr(int);
  static int	 verify_gpt(int);
@@ -63,7 +72,7 @@ diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.c sbin/cgdconfig/cgdconfig.c
  
  __dead static void	 usage(void);
  
-@@ -1024,6 +1032,10 @@ verify(struct params *p, int fd)
+@@ -1024,6 +1032,10 @@
  		return verify_mbr(fd);
  	case VERIFY_GPT:
  		return verify_gpt(fd);
@@ -74,7 +83,7 @@ diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.c sbin/cgdconfig/cgdconfig.c
  	default:
  		warnx("unimplemented verification method");
  		return -1;
-@@ -1182,6 +1194,47 @@ verify_gpt(int fd)
+@@ -1182,6 +1194,47 @@
  	return ret;
  }
  
@@ -122,10 +131,14 @@ diff -p -U 3 sbin/cgdconfig.orig/cgdconfig.c sbin/cgdconfig/cgdconfig.c
  static off_t sblock_try[] = SBLOCKSEARCH;
  
  static int
-diff -p -U 3 sbin/cgdconfig.orig/params.c sbin/cgdconfig/params.c
---- sbin/cgdconfig.orig/params.c	2023-05-28 13:29:40.277737528 +0000
-+++ sbin/cgdconfig/params.c
-@@ -287,6 +287,10 @@ params_verify_method(string_t *in)
+Index: sbin/cgdconfig/params.c
+===================================================================
+RCS file: /cvsroot/src/sbin/cgdconfig/params.c,v
+retrieving revision 1.34
+diff -u -r1.34 params.c
+--- sbin/cgdconfig/params.c	12 Aug 2022 10:49:35 -0000	1.34
++++ sbin/cgdconfig/params.c	8 Aug 2023 19:23:05 -0000
+@@ -287,6 +287,10 @@
  		p->verify_method = VERIFY_MBR;
  	if (!strcmp("gpt", vm))
  		p->verify_method = VERIFY_GPT;
@@ -136,7 +149,7 @@ diff -p -U 3 sbin/cgdconfig.orig/params.c sbin/cgdconfig/params.c
  
  	string_free(in);
  
-@@ -1065,6 +1069,11 @@ params_fput(struct params *p, FILE *f)
+@@ -1065,6 +1069,11 @@
  	case VERIFY_GPT:
  		print_kvpair_cstr(f, ts, "verify_method", "gpt");
  		break;
@@ -148,10 +161,14 @@ diff -p -U 3 sbin/cgdconfig.orig/params.c sbin/cgdconfig/params.c
  	default:
  		warnx("unsupported verify_method (%d)", p->verify_method);
  		return -1;
-diff -p -U 3 sbin/cgdconfig.orig/params.h sbin/cgdconfig/params.h
---- sbin/cgdconfig.orig/params.h	2023-05-28 13:26:55.806960846 +0000
-+++ sbin/cgdconfig/params.h
-@@ -81,6 +81,7 @@ struct params {
+Index: sbin/cgdconfig/params.h
+===================================================================
+RCS file: /cvsroot/src/sbin/cgdconfig/params.h,v
+retrieving revision 1.14
+diff -u -r1.14 params.h
+--- sbin/cgdconfig/params.h	12 Aug 2022 10:49:35 -0000	1.14
++++ sbin/cgdconfig/params.h	8 Aug 2023 19:23:05 -0000
+@@ -81,6 +81,7 @@
  #define VERIFY_REENTER		0x4
  #define VERIFY_MBR      	0x5
  #define VERIFY_GPT      	0x6
@@ -159,3 +176,31 @@ diff -p -U 3 sbin/cgdconfig.orig/params.h sbin/cgdconfig/params.h
  
  /* shared key derivation methods */
  
+Index: rescue/Makefile
+===================================================================
+RCS file: /cvsroot/src/rescue/Makefile,v
+retrieving revision 1.42
+diff -u -r1.42 Makefile
+--- rescue/Makefile	4 Apr 2020 17:57:16 -0000	1.42
++++ rescue/Makefile	8 Aug 2023 19:23:05 -0000
+@@ -42,6 +42,10 @@
+ LISTS+=		${.CURDIR}/list.inet6
+ .endif
+ 
++.if ${MKZFS} != "no"
++LISTS+=		${.CURDIR}/list.zfs
++.endif
++
+ LISTS+=		${.CURDIR}/list.crypto
+ CRUNCHENV+=	MKKERBEROS=no		# for ssh
+ 
+Index: rescue/list.zfs
+===================================================================
+RCS file: rescue/list.zfs
+diff -N rescue/list.zfs
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ rescue/list.zfs	8 Aug 2023 19:23:05 -0000
+@@ -0,0 +1,3 @@
++#	$NetBSD$
++
++LIBS	-lnvpair

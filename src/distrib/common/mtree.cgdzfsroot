@@ -1,7 +1,0 @@
-#	$NetBSD$
-
-.
-./altroot
-./boot
-./efi
-./etc
